@@ -4,8 +4,6 @@ general:
   - "gc.log"
 
 machine:
-  services:
-  - docker
   environment:
     JAVA_OPTS: "-XX:+CMSClassUnloadingEnabled -XX:MaxMetaspaceSize=512M -XX:MetaspaceSize=512M -Xms2G -Xmx2G -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:gc.log"
   java:
@@ -13,7 +11,6 @@ machine:
 
 dependencies:
   pre:
-  - sudo apt-get update; sudo apt-get install -y node
   - wget -q https://dl.bintray.com/sbt/debian/sbt-0.13.9.deb
   - sudo dpkg -i sbt-0.13.9.deb
   - mkdir -p ~/.sbt/0.13
@@ -21,28 +18,11 @@ dependencies:
     - "~/.ivy2"
     - "~/.sbt"
     - "project/target/resolution-cache"
-    - "client/target/resolution-cache"
-    - "domain/target/resolution-cache"
-    - "server/target/resolution-cache"
-    - "service/target/resolution-cache"
     - "target/resolution-cache"
 
 test:
-  pre:
-  - echo "concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)" > parallelism.sbt
   override:
   - sbt -v test:test:
-      timeout: 1200
   post:
   - mkdir -p $CIRCLE_TEST_REPORTS/junit/
   - find . -type f -regex ".*/target/test-reports/.*xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
-
-deployment:
-  staging:
-    branch: master
-    heroku:
-      appname: minerva-stag
-
-
-
-

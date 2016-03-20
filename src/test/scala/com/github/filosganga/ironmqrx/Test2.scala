@@ -4,10 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
 
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import GraphDSL.Implicits._
 
 object Test2 extends App {
 
