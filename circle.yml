@@ -22,7 +22,7 @@ dependencies:
 
 test:
   override:
-  - sbt -v test:test:
+  - sbt -v test:test
   post:
   - mkdir -p $CIRCLE_TEST_REPORTS/junit/
   - find . -type f -regex ".*/target/test-reports/.*xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
