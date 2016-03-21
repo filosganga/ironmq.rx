@@ -25,6 +25,14 @@ trait Codec {
     cursor.downField("ids").as[List[Message.Id]].map(Message.Ids.apply)
   }
 
+  implicit val queueNameDecoder: Decoder[Queue.Name] = Decoder.instance { cursor =>
+    cursor.as[String].map(Queue.Name.apply)
+  }
+
+  implicit val queueNameEncoder: Encoder[Queue.Name] = Encoder.instance { qn =>
+    Json.string(qn.value)
+  }
+
   implicit val messageDecoder: Decoder[Message] = Decoder.instance { cursor =>
     for {
       id <- cursor.downField("id").as[Message.Id]

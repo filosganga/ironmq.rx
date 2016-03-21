@@ -3,40 +3,37 @@ package com.github.filosganga.ironmqrx
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpResponse, HttpRequest, Uri}
-import akka.http.scaladsl.model.headers.{GenericHttpCredentials, OAuth2BearerToken, Authorization}
-import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
+import akka.http.scaladsl.client.RequestBuilding._
+import akka.http.scaladsl.model.headers.{Authorization, GenericHttpCredentials}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import cats.data.Xor
+import com.github.filosganga.ironmqrx.Codec._
 import com.typesafe.config.Config
-import io.circe.{Decoder, HCursor, Cursor, Json}
-import org.reactivestreams.{Subscriber, Publisher}
-
-import scala.concurrent.duration.{FiniteDuration, Duration}
-import scala.concurrent.{ExecutionContext, Future}
-import akka.http.scaladsl.client.RequestBuilding._
-import Codec._
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
+import io.circe.{ACursor, JsonObject, Json}
 import io.circe.syntax._
 
+import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-object IronMqSettings {
-  def apply(config: Config): IronMqSettings =
-    new IronMqSettings(config.getConfig("ironmq-rx"))
+object IronMqClient {
 
-  def apply(as: ActorSystem): IronMqSettings =
-    apply(as.settings.config)
+  def apply(actorSystem: ActorSystem): IronMqClient =
+    apply(actorSystem, actorSystem.settings.config)
+
+  def apply(actorSystem: ActorSystem, config: Config): IronMqClient =
+    apply(actorSystem, IronMqSettings(config))
+
+  def apply(actorSystem: ActorSystem, settings: IronMqSettings): IronMqClient =
+    new IronMqClient(actorSystem, settings)
 
 }
 
-class IronMqSettings(config: Config) {
-  val host: String = config.getString("host")
-  val projectId: String = config.getString("credentials.project-id")
-  val token: String = config.getString("credentials.token")
-}
 
 class IronMqClient(actorSystem: ActorSystem, settings: IronMqSettings) extends AutoCloseable {
 
@@ -58,6 +55,35 @@ class IronMqClient(actorSystem: ActorSystem, settings: IronMqSettings) extends A
         FastFuture.failed(error)
     }
 
+  def listQueues(prefix: Option[String] = None, from: Option[Queue.Name] = None, noOfQueues: Int = 50)(implicit ec: ExecutionContext): Future[Iterable[Queue.Name]] = {
+
+    def parseQueues(json: Json) = {
+
+      def extractName(json: Json) = json.hcursor.downField("name").as[Json].getOrElse(Json.empty)
+
+      json.hcursor.downField("queues").withFocus { xsJson =>
+        xsJson.mapArray { xs =>
+          xs.map(extractName)
+        }
+      }.as[Iterable[Queue.Name]]
+    }
+
+    val query = List(prefix.map("prefix" -> _), from.map("previous" -> _.value))
+      .collect {
+        case Some(x) => x
+      }
+      .foldLeft(Uri.Query("per_page" -> noOfQueues.toString)) { (q, x) =>
+        x +: q
+      }
+
+    makeRequest(Get(Uri(s"/3/projects/${settings.projectId}/queues").withQuery(query)))
+      .flatMap(Unmarshal(_).to[Json])
+      .map(parseQueues)
+      .collect {
+        case Xor.Right(xs) => xs
+      }
+  }
+
   def pushMessages(queue: String, messages: PushMessage*)(implicit ec: ExecutionContext): Future[Message.Ids] = {
 
     val payload = Json.obj("messages" -> Json.fromValues(
@@ -77,11 +103,11 @@ class IronMqClient(actorSystem: ActorSystem, settings: IronMqSettings) extends A
     watch: Duration = Duration.Undefined
   )(implicit ec: ExecutionContext): Future[Iterable[ReservedMessage]] = {
 
-    val payload = (if(timeout.isFinite()){
+    val payload = (if (timeout.isFinite()) {
       Json.obj("timeout" -> Json.long(timeout.toSeconds))
     } else {
       Json.empty
-    }) deepMerge (if(watch.isFinite()) {
+    }) deepMerge (if (watch.isFinite()) {
       Json.obj("wait" -> Json.long(watch.toSeconds))
     } else {
       Json.empty
@@ -104,11 +130,11 @@ class IronMqClient(actorSystem: ActorSystem, settings: IronMqSettings) extends A
     watch: Duration = Duration.Undefined
   )(implicit ec: ExecutionContext): Future[Iterable[Message]] = {
 
-    val payload = (if(timeout.isFinite()){
+    val payload = (if (timeout.isFinite()) {
       Json.obj("timeout" -> Json.long(timeout.toSeconds))
     } else {
       Json.empty
-    }) deepMerge (if(watch.isFinite()) {
+    }) deepMerge (if (watch.isFinite()) {
       Json.obj("wait" -> Json.long(watch.toSeconds))
     } else {
       Json.empty

@@ -35,3 +35,13 @@ case class ReservedMessage(reservationId: Reservation.Id, message: Message) {
   val messageBody: String = message.body
   val reservation: Reservation = Reservation(messageId, reservationId)
 }
+
+
+case class Queue(name: Queue.Name)
+
+object Queue {
+
+  case class Name(value: String) extends AnyVal {
+    override def toString: String = value
+  }
+}
