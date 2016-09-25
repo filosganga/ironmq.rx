@@ -22,7 +22,8 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
   val maxBufferSize = 100
 
   val fetchInterval = 100.millis
-  val deleteInterval = 50.millis
+  val deleteInterval = 10.seconds
+  val reservationTimeout = 1.minute
 
   override def shape: SourceShape[Message] = SourceShape(messages)
 
@@ -41,7 +42,7 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
         override def onPull(): Unit = {
 
           if(!isTimerActive(FetchMessagesTimerKey)) {
-            schedulePeriodically(FetchMessagesTimerKey, 100.milliseconds)
+            schedulePeriodically(FetchMessagesTimerKey, fetchInterval)
           }
 
           deliveryMessages()
@@ -49,25 +50,32 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
 
         override def onDownstreamFinish(): Unit = {
           releaseMessages().onComplete { _ =>
-            close()
+            client.close()
             super.onDownstreamFinish()
           }
         }
       })
 
       override protected def onTimer(timerKey: Any): Unit = timerKey match {
+
         case FetchMessagesTimerKey =>
           fetchMessages()
+
         case DeleteMessagesTimerKey =>
           deleteMessages()
 
       }
 
+      override def postStop(): Unit = {
+        client.close()
+        super.postStop()
+      }
+
       def fetchMessages(): Unit = {
 
-        if (!fetching && buffer.size < 25) {
+        if (!fetching && buffer.size < minBufferSize) {
           fetching = true
-          client.reserveMessages(queue, maxBufferSize - buffer.size, timeout = 1.minute).onComplete {
+          client.reserveMessages(queue, maxBufferSize - buffer.size, timeout = reservationTimeout).onComplete {
             case Success(xs) =>
               updateBuffer.invoke(xs.toList)
               updateFetching.invoke(false)
@@ -97,7 +105,7 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
         }
 
         if(!isTimerActive(DeleteMessagesTimerKey)){
-          schedulePeriodically(DeleteMessagesTimerKey, 10.seconds)
+          schedulePeriodically(DeleteMessagesTimerKey, deleteInterval)
         }
       }
 
@@ -118,14 +126,6 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
         reservations = xs
       }
 
-      override def postStop(): Unit = {
-        close()
-        super.postStop()
-      }
-
-      def close() {
-        client.close()
-      }
     }
   }
 
