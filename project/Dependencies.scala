@@ -1,10 +1,9 @@
 import sbt._
-import org.scalajs.sbtplugin.ScalaJSPlugin.AutoImport._
 
 object Versions {
 
   val typesafeConfig = "1.3.0"
-  val akka = "2.4.9"
+  val akka = "2.4.10"
   val scalaTest = "3.0.0"
   val scalaCheck = "1.12.5"
   val scalaMock = "3.2"
