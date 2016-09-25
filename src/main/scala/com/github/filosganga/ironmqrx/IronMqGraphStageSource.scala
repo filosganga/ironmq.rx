@@ -16,7 +16,6 @@ object IronMqGraphStageSource {
 class IronMqGraphStageSource(queue: String, clientProvider: () => IronMqClient) extends GraphStage[SourceShape[Message]] {
   import IronMqGraphStageSource._
 
-  val client: IronMqClient = clientProvider()
   val messages: Outlet[Message] = Outlet("messages")
 
   val minBufferSize = 25
@@ -25,7 +24,6 @@ class IronMqGraphStageSource(queue: String, clientProvider: () => IronMqClient) 
   val fetchInterval = 100.millis
   val deleteInterval = 50.millis
 
-
   override def shape: SourceShape[Message] = SourceShape(messages)
 
   override def createLogic(inheritedAttributes: Attributes): TimerGraphStageLogic = {
@@ -33,12 +31,13 @@ class IronMqGraphStageSource(queue: String, clientProvider: () => IronMqClient) 
 
       implicit def ec = materializer.executionContext
 
-      var closed = false
       var fetching: Boolean = false
       var buffer: List[ReservedMessage] = List.empty
       var reservations: List[Reservation] = List.empty
+      val client: IronMqClient = clientProvider()
 
       setHandler(messages, new OutHandler {
+
         override def onPull(): Unit = {
 
           if(!isTimerActive(FetchMessagesTimerKey)) {
@@ -46,7 +45,6 @@ class IronMqGraphStageSource(queue: String, clientProvider: () => IronMqClient) 
           }
 
           deliveryMessages()
-
         }
 
         override def onDownstreamFinish(): Unit = {
@@ -126,10 +124,7 @@ class IronMqGraphStageSource(queue: String, clientProvider: () => IronMqClient) 
       }
 
       def close() {
-        if (!closed) {
-          closed = true
-          client.close()
-        }
+        client.close()
       }
     }
   }

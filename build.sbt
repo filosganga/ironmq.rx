@@ -30,19 +30,7 @@ lazy val ironmqrx = (project in file("."))
     )
   ),
 
-  scalaVersion := "2.11.7",
-  scalacOptions ++= Seq(
-    "-deprecation",
-    "-unchecked",
-    "-encoding", "UTF-8",
-    // "-Xcheckinit" // for debugging only, see https://github.com/paulp/scala-faq/wiki/Initialization-Order
-    // "-optimise"   // this option will slow your build
-    "-Yclosure-elim",
-    "-Yinline",
-    "-Xverify",
-    "-feature"
-  ),
-  javacOptions ++= Seq("-Xlint:unchecked", "-Xlint:deprecation"),
+  scalaVersion := "2.11.8",
 
   resolvers ++= Seq(
     Resolver.mavenLocal,
@@ -50,29 +38,17 @@ lazy val ironmqrx = (project in file("."))
   ),
 
   libraryDependencies ++= Seq(
-    spire.cats.all,
-    shapeless,
-    simulacrum,
-    scalaArm,
     typesafe.config,
-    slf4j.api,
-    log4j.log4jToSlf4j,
     // -- Akka
-    akka.actor,
-    akka.slf4j,
-    akka.stream,    
+    akka.stream,
     akka.http,
     akka.httpJson.circe,
-    circe.core,
-    circe.generic,
-    circe.parser,
     // -- Testing --
     scalaTest % Test,
     scalaCheck % Test,
     scalaMock.scalaTestSupport % Test,
     akka.httpTestKit % Test,
-    akka.streamTestKit % Test,
-    logback.classic % Test
+    akka.streamTestKit % Test
   )
 )
 

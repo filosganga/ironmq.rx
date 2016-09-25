@@ -7,9 +7,6 @@ import scala.concurrent.ExecutionContext
 
 class IronMqGraphStageSink(queue: String, clientProvider: () => IronMqClient) extends GraphStage[SinkShape[String]] {
 
-  val client = clientProvider()
-  val closeTimeoutMs = 1000L
-
   val messages: Inlet[String] = Inlet("messages")
 
   override val shape: SinkShape[String] = SinkShape(messages)
@@ -17,9 +14,10 @@ class IronMqGraphStageSink(queue: String, clientProvider: () => IronMqClient) ex
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
 
     implicit def ec: ExecutionContext = materializer.executionContext
-    var closed = false
+    val client = clientProvider()
 
     setHandler(messages, new InHandler {
+
       override def onPush(): Unit = {
         val element = grab(messages)
 
@@ -29,25 +27,10 @@ class IronMqGraphStageSink(queue: String, clientProvider: () => IronMqClient) ex
 
         pull(messages)
       }
-
-      override def onUpstreamFinish(): Unit = {
-        close()
-      }
-
-      override def onUpstreamFailure(ex: Throwable): Unit = {
-        close()
-      }
     })
 
-    def close(): Unit =
-      if (!closed) {
-        client.close()
-        closed = true
-      }
-
-    override def afterPostStop(): Unit = {
-      close()
-      super.afterPostStop()
+    override def postStop(): Unit = {
+      client.close()
     }
 
     override def preStart(): Unit = {

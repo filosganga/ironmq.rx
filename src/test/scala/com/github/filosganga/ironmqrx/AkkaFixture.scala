@@ -7,7 +7,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 
-trait AkkaFixture extends BeforeAndAfterAll {
+trait AkkaFixture extends ConfigFixture with BeforeAndAfterAll {
   _: Suite =>
 
   private var unsafeActorSystem: ActorSystem = _
@@ -15,12 +15,11 @@ trait AkkaFixture extends BeforeAndAfterAll {
 
   override protected def beforeAll(){
     super.beforeAll()
-    unsafeActorSystem = ActorSystem()
+    unsafeActorSystem = ActorSystem(s"test-${System.currentTimeMillis()}", config)
   }
 
   override protected def afterAll(){
-    val actorSystemTermination = unsafeActorSystem.terminate()
+    unsafeActorSystem.terminate()
     super.afterAll()
-    Await.result(actorSystemTermination, 15.seconds)
   }
 }

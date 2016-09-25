@@ -6,7 +6,7 @@ import io.circe.syntax._
 trait Codec {
 
   implicit val messageIdEncoder: Encoder[Message.Id] = Encoder.instance { id =>
-    Json.string(id.value)
+    Json.fromString(id.value)
   }
 
   implicit val messageIdDecoder: Decoder[Message.Id] = Decoder.instance { cursor =>
@@ -14,7 +14,7 @@ trait Codec {
   }
 
   implicit val reservationIdEncoder: Encoder[Reservation.Id] = Encoder.instance { id =>
-    Json.string(id.value)
+    Json.fromString(id.value)
   }
 
   implicit val reservationIdDecoder: Decoder[Reservation.Id] = Decoder.instance { cursor =>
@@ -25,12 +25,18 @@ trait Codec {
     cursor.downField("ids").as[List[Message.Id]].map(Message.Ids.apply)
   }
 
+  implicit val queueDecoder: Decoder[Queue] = Decoder.instance { cursor =>
+    for {
+      name <- cursor.downField("name").as[Queue.Name]
+    } yield Queue(name)
+  }
+
   implicit val queueNameDecoder: Decoder[Queue.Name] = Decoder.instance { cursor =>
     cursor.as[String].map(Queue.Name.apply)
   }
 
   implicit val queueNameEncoder: Encoder[Queue.Name] = Encoder.instance { qn =>
-    Json.string(qn.value)
+    Json.fromString(qn.value)
   }
 
   implicit val messageDecoder: Decoder[Message] = Decoder.instance { cursor =>
