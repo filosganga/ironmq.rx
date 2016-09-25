@@ -5,7 +5,7 @@ import akka.stream.stage.{InHandler, GraphStageLogic, GraphStage}
 
 import scala.concurrent.ExecutionContext
 
-class IronMqGraphStageSink(queue: String, clientProvider: () => IronMqClient) extends GraphStage[SinkShape[String]] {
+class IronMqGraphStageSink(queue: Queue.Name, clientProvider: () => IronMqClient) extends GraphStage[SinkShape[String]] {
 
   val messages: Inlet[String] = Inlet("messages")
 

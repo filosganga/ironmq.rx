@@ -13,7 +13,7 @@ object IronMqGraphStageSource {
   val DeleteMessagesTimerKey = "delete-messages"
 }
 
-class IronMqGraphStageSource(queue: String, clientProvider: () => IronMqClient) extends GraphStage[SourceShape[Message]] {
+class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClient) extends GraphStage[SourceShape[Message]] {
   import IronMqGraphStageSource._
 
   val messages: Outlet[Message] = Outlet("messages")
