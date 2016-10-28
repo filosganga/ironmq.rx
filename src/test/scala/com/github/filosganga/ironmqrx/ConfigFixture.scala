@@ -7,6 +7,6 @@ import org.scalatest.Suite
 trait ConfigFixture {
   _: Suite =>
 
-  def config = ConfigFactory.defaultReference()
+  lazy val config = ConfigFactory.defaultReference()
 
 }

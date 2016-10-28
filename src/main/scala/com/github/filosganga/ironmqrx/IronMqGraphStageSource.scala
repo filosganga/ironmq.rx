@@ -10,7 +10,6 @@ import scala.concurrent.duration._
 object IronMqGraphStageSource {
 
   val FetchMessagesTimerKey = "fetch-messages"
-  val DeleteMessagesTimerKey = "delete-messages"
 }
 
 class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClient) extends GraphStage[SourceShape[Message]] {
@@ -21,9 +20,8 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
   val minBufferSize = 25
   val maxBufferSize = 100
 
-  val fetchInterval = 100.millis
-  val deleteInterval = 10.seconds
-  val reservationTimeout = 1.minute
+  val fetchInterval = 150.millis
+  val pullTimeout = 50.millis
 
   override def shape: SourceShape[Message] = SourceShape(messages)
 
@@ -33,8 +31,7 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
       implicit def ec = materializer.executionContext
 
       var fetching: Boolean = false
-      var buffer: List[ReservedMessage] = List.empty
-      var reservations: List[Reservation] = List.empty
+      var buffer: List[Message] = List.empty
       val client: IronMqClient = clientProvider()
 
       setHandler(messages, new OutHandler {
@@ -47,22 +44,12 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
 
           deliveryMessages()
         }
-
-        override def onDownstreamFinish(): Unit = {
-          releaseMessages().onComplete { _ =>
-            client.close()
-            super.onDownstreamFinish()
-          }
-        }
       })
 
       override protected def onTimer(timerKey: Any): Unit = timerKey match {
 
         case FetchMessagesTimerKey =>
           fetchMessages()
-
-        case DeleteMessagesTimerKey =>
-          deleteMessages()
 
       }
 
@@ -75,7 +62,7 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
 
         if (!fetching && buffer.size < minBufferSize) {
           fetching = true
-          client.reserveMessages(queue, maxBufferSize - buffer.size, timeout = reservationTimeout).onComplete {
+          client.pullMessages(queue, maxBufferSize - buffer.size, watch = pullTimeout).onComplete {
             case Success(xs) =>
               updateBuffer.invoke(xs.toList)
               updateFetching.invoke(false)
@@ -86,44 +73,21 @@ class IronMqGraphStageSource(queue: Queue.Name, clientProvider: () => IronMqClie
         }
       }
 
-      def deleteMessages(): Unit = {
-        val (toDelete, toKeep) = reservations.splitAt(100)
-        client.deleteMessages(queue, toDelete).onComplete {
-          case Success(_) =>
-            updateReservations.invoke(toKeep)
-          case Failure(error) =>
-            fail(messages, error)
-        }
-      }
-
       def deliveryMessages(): Unit = {
         while(buffer.nonEmpty && isAvailable(messages)) {
           val messageToDelivery = buffer.head
-          push(messages, messageToDelivery.message)
-          reservations = messageToDelivery.reservation :: reservations
+          push(messages, messageToDelivery)
           buffer = buffer.tail
         }
-
-        if(!isTimerActive(DeleteMessagesTimerKey)){
-          schedulePeriodically(DeleteMessagesTimerKey, deleteInterval)
-        }
       }
 
-      def releaseMessages(): Future[Unit] = {
-        Future.sequence(reservations.map(reservation => client.releaseMessage(queue, reservation))).map(_ => Unit)
-      }
-
-      val updateBuffer = getAsyncCallback { xs: List[ReservedMessage] =>
+      val updateBuffer = getAsyncCallback { xs: List[Message] =>
         buffer = buffer ::: xs
         deliveryMessages()
       }
 
       val updateFetching = getAsyncCallback { x: Boolean =>
         fetching = x
-      }
-
-      val updateReservations = getAsyncCallback { xs: List[Reservation] =>
-        reservations = xs
       }
 
     }

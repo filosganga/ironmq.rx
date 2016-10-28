@@ -10,16 +10,10 @@ import scala.concurrent.duration._
 trait AkkaFixture extends ConfigFixture with BeforeAndAfterAll {
   _: Suite =>
 
-  private var unsafeActorSystem: ActorSystem = _
-  implicit def actorSystem: ActorSystem = unsafeActorSystem
-
-  override protected def beforeAll(){
-    super.beforeAll()
-    unsafeActorSystem = ActorSystem(s"test-${System.currentTimeMillis()}", config)
-  }
+  implicit lazy val actorSystem: ActorSystem = ActorSystem(s"test-${System.currentTimeMillis()}", config)
 
   override protected def afterAll(){
-    unsafeActorSystem.terminate()
+    actorSystem.terminate()
     super.afterAll()
   }
 }

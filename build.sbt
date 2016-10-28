@@ -46,7 +46,6 @@ lazy val ironmqrx = (project in file("."))
     // -- Testing --
     scalaTest % Test,
     scalaCheck % Test,
-    scalaMock.scalaTestSupport % Test,
     akka.httpTestKit % Test,
     akka.streamTestKit % Test
   )
